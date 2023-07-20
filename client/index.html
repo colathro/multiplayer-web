@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="utf-8" />
+    <title>hello-wasm example</title>
+    <style>
+      .server-cursor {
+        position: fixed;
+        background: red;
+        width: 10px;
+        height: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <script type="module">
+      import init, { start_websocket, send_location } from "./pkg/client.js";
+      init().then(() => {
+        let id_map = {};
+
+        let cb = function (id, x, y) {
+          if (id in id_map) {
+            let element = id_map[id];
+
+            let pixel_x = window.innerWidth * x;
+            let pixel_y = window.innerHeight * y;
+            element.style.top = `${pixel_y}px`;
+            element.style.left = `${pixel_x}px`;
+          } else {
+            let element = document.createElement("div");
+            element.className = "server-cursor";
+            id_map[id] = element;
+            try {
+              let pixel_x = window.innerWidth * x;
+              let pixel_y = window.innerHeight * y;
+              element.style.top = `${pixel_y}px`;
+              element.style.left = `${pixel_x}px`;
+
+              document.getElementsByTagName("html")[0].append(element);
+            } catch (e) {
+              console.log(e);
+            }
+          }
+        };
+
+        let r = start_websocket(cb);
+
+        console.log(r);
+
+        let hmtl = document.getElementsByTagName("html")[0];
+
+        hmtl.onmousemove = (ev) => {
+          let percent_x = ev.pageX / window.innerWidth;
+          let percent_y = ev.pageY / window.innerHeight;
+          send_location(r, percent_x, percent_y);
+        };
+      });
+    </script>
+  </body>
+</html>
