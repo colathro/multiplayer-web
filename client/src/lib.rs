@@ -1,5 +1,5 @@
 use rand::prelude::*;
-use shared::{Auth, Location, Message, MessageType};
+use shared::{Auth, Despawn, Location, Message, MessageType, Spawn};
 use wasm_bindgen::prelude::*;
 use web_sys::{ErrorEvent, MessageEvent, WebSocket};
 
@@ -13,11 +13,6 @@ extern "C" {
 
     #[wasm_bindgen(js_namespace = console)]
     fn log(s: &str);
-}
-
-#[wasm_bindgen]
-pub unsafe fn greet(name: &str) {
-    alert(&format!("Hello, {}!", name));
 }
 
 #[wasm_bindgen]
@@ -44,6 +39,8 @@ pub unsafe fn send_location(wss: &mut WebSocketSend, x: f32, y: f32) {
 #[wasm_bindgen]
 pub unsafe fn start_websocket(
     set_cursor_callback: js_sys::Function,
+    spawn_cursor_callback: js_sys::Function,
+    despawn_cursor_callback: js_sys::Function,
 ) -> Result<WebSocketSend, JsValue> {
     // Connect to an echo server
     let ws: WebSocket = WebSocket::new("ws://127.0.0.1:8080/ws/")?;
@@ -65,6 +62,19 @@ pub unsafe fn start_websocket(
                             &JsValue::from(location.x),
                             &JsValue::from(location.y),
                         );
+                    }
+                    MessageType::Spawn => {
+                        let spawn = Spawn::deserialize(&message.data).unwrap();
+                        let _ = spawn_cursor_callback.call2(
+                            &JsValue::null(),
+                            &JsValue::from(spawn.id),
+                            &JsValue::from(spawn.icon),
+                        );
+                    }
+                    MessageType::Despawn => {
+                        let despawn = Despawn::deserialize(&message.data).unwrap();
+                        let _ = despawn_cursor_callback
+                            .call1(&JsValue::null(), &JsValue::from(despawn.id));
                     }
                     _ => return,
                 },

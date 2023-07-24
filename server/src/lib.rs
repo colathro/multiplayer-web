@@ -58,20 +58,48 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWs {
 
                                         let mut pool =
                                             pools.get(&auth.url).unwrap().write().unwrap();
-                                        let (tx, rx): (Sender<Location>, Receiver<Location>) =
+                                        let (tx, rx): (Sender<PoolMessage>, Receiver<PoolMessage>) =
                                             mpsc::channel();
 
                                         // startup an interval
                                         ctx.run_interval(
                                             Duration::from_millis(10),
-                                            move |act, ctx| {
-                                                for location in rx.try_iter() {
-                                                    let data = location.serialize().unwrap();
-                                                    let message = Message {
-                                                        message_type: MessageType::UserLocation,
-                                                        data,
-                                                    };
-                                                    ctx.binary(message.serialize().unwrap());
+                                            move |_, ctx| {
+                                                for pool_message in rx.try_iter() {
+                                                    match pool_message {
+                                                        PoolMessage::LocationUpdate(location) => {
+                                                            let data =
+                                                                location.serialize().unwrap();
+                                                            let message = Message {
+                                                                message_type:
+                                                                    MessageType::UserLocation,
+                                                                data,
+                                                            };
+                                                            ctx.binary(
+                                                                message.serialize().unwrap(),
+                                                            );
+                                                        }
+                                                        PoolMessage::SpawnEntity(spawn) => {
+                                                            let data = spawn.serialize().unwrap();
+                                                            let message = Message {
+                                                                message_type: MessageType::Spawn,
+                                                                data,
+                                                            };
+                                                            ctx.binary(
+                                                                message.serialize().unwrap(),
+                                                            );
+                                                        }
+                                                        PoolMessage::DespawnEntity(despawn) => {
+                                                            let data = despawn.serialize().unwrap();
+                                                            let message = Message {
+                                                                message_type: MessageType::Despawn,
+                                                                data,
+                                                            };
+                                                            ctx.binary(
+                                                                message.serialize().unwrap(),
+                                                            );
+                                                        }
+                                                    }
                                                 }
                                             },
                                         );
@@ -79,6 +107,28 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWs {
                                         // insert the sender into the pool
                                         // other thread/sockets will be sending through this
                                         pool.insert(auth.id, Mutex::new(tx.clone()));
+
+                                        for (id, sender) in pool.iter() {
+                                            if *id == auth.id {
+                                                continue;
+                                            }
+                                            let s_lock = sender.lock().unwrap();
+                                            let _ = s_lock.send(PoolMessage::SpawnEntity(Spawn {
+                                                id: auth.id,
+                                                icon: auth.url.clone(),
+                                            }));
+                                        }
+
+                                        for (id, _) in pool.iter() {
+                                            if *id == auth.id {
+                                                continue;
+                                            }
+                                            let _ =
+                                                tx.clone().send(PoolMessage::SpawnEntity(Spawn {
+                                                    id: *id,
+                                                    icon: String::from("test"),
+                                                }));
+                                        }
                                     }
                                     Err(_) => {
                                         return; // do nothing
@@ -87,7 +137,13 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWs {
                                 return;
                             }
                             MessageType::UserLocation => {
-                                return; // do nothing
+                                return; // server doesn't handle these events incoming
+                            }
+                            MessageType::Spawn => {
+                                return; // server doesn't handle these events incoming
+                            }
+                            MessageType::Despawn => {
+                                return; // server doesn't handle these events incoming
                             }
                             MessageType::MyLocation => match Location::deserialize(&message.data) {
                                 Ok(mut location) => {
@@ -99,7 +155,8 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWs {
                                         let pool = pools.get(url).unwrap().read().unwrap();
                                         for (_, sender) in pool.iter() {
                                             let s_lock = sender.lock().unwrap();
-                                            let _ = s_lock.send(location);
+                                            let _ =
+                                                s_lock.send(PoolMessage::LocationUpdate(location));
                                         }
                                     }
                                 }
@@ -112,7 +169,28 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWs {
                     }
                 }
             }
-            Ok(ws::Message::Close(rsn)) => println!("closing: {:?}", rsn),
+            Ok(ws::Message::Close(rsn)) => {
+                println!("closing: {:?}", rsn);
+
+                if let (Some(user_id), Some(url)) =
+                    (self.user_id.borrow().as_ref(), self.url.borrow().as_ref())
+                {
+                    let pools = self.messaging_pools.read().unwrap();
+                    let mut pool = pools.get(url).unwrap().write().unwrap();
+                    pool.remove(user_id);
+                }
+
+                if let (Some(user_id), Some(url)) =
+                    (self.user_id.borrow().as_ref(), self.url.borrow().as_ref())
+                {
+                    let pools = self.messaging_pools.read().unwrap();
+                    let pool = pools.get(url).unwrap().read().unwrap();
+                    for (_, sender) in pool.iter() {
+                        let s_lock = sender.lock().unwrap();
+                        let _ = s_lock.send(PoolMessage::DespawnEntity(Despawn { id: *user_id }));
+                    }
+                }
+            }
             _ => (),
         }
     }
@@ -152,4 +230,10 @@ pub async fn start() -> std::io::Result<()> {
     .await
 }
 
-type MessagingPools = RwLock<HashMap<String, RwLock<HashMap<u64, Mutex<Sender<Location>>>>>>;
+type MessagingPools = RwLock<HashMap<String, RwLock<HashMap<u64, Mutex<Sender<PoolMessage>>>>>>;
+
+enum PoolMessage {
+    LocationUpdate(Location),
+    SpawnEntity(Spawn),
+    DespawnEntity(Despawn),
+}

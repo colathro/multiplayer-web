@@ -18,7 +18,7 @@
       init().then(() => {
         let id_map = {};
 
-        let cb = function (id, x, y) {
+        let move_cursor_cb = function (id, x, y) {
           if (id in id_map) {
             let element = id_map[id];
 
@@ -26,24 +26,38 @@
             let pixel_y = window.innerHeight * y;
             element.style.top = `${pixel_y}px`;
             element.style.left = `${pixel_x}px`;
-          } else {
-            let element = document.createElement("div");
-            element.className = "server-cursor";
-            id_map[id] = element;
-            try {
-              let pixel_x = window.innerWidth * x;
-              let pixel_y = window.innerHeight * y;
-              element.style.top = `${pixel_y}px`;
-              element.style.left = `${pixel_x}px`;
-
-              document.getElementsByTagName("html")[0].append(element);
-            } catch (e) {
-              console.log(e);
-            }
           }
         };
 
-        let r = start_websocket(cb);
+        let spawn_cursor_cb = function (id, icon) {
+          console.log(`spawning ${id}`);
+          let element = document.createElement("div");
+          element.className = "server-cursor";
+          id_map[id] = element;
+          try {
+            element.style.top = `0px`;
+            element.style.left = `0px`;
+
+            document.getElementsByTagName("html")[0].append(element);
+          } catch (e) {
+            console.log(e);
+          }
+        };
+
+        let despawn_cursor_cb = function (id) {
+          if (id in id_map) {
+            console.log(`despawning ${id}`);
+            let element = id_map[id];
+            element.remove();
+            delete id_map[id];
+          }
+        };
+
+        let r = start_websocket(
+          move_cursor_cb,
+          spawn_cursor_cb,
+          despawn_cursor_cb
+        );
 
         console.log(r);
 

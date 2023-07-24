@@ -21,6 +21,8 @@ pub enum MessageType {
     Auth,
     UserLocation,
     MyLocation,
+    Spawn,
+    Despawn,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
@@ -67,6 +69,37 @@ impl Location {
     }
 
     pub fn deserialize(bytes: &[u8]) -> Result<Location, Box<dyn std::error::Error>> {
+        Ok(bincode::deserialize(bytes)?)
+    }
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
+pub struct Spawn {
+    pub id: u64,
+    pub icon: String,
+}
+
+impl Spawn {
+    pub fn serialize(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        Ok(bincode::serialize(self)?)
+    }
+
+    pub fn deserialize(bytes: &[u8]) -> Result<Spawn, Box<dyn std::error::Error>> {
+        Ok(bincode::deserialize(bytes)?)
+    }
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Copy)]
+pub struct Despawn {
+    pub id: u64,
+}
+
+impl Despawn {
+    pub fn serialize(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        Ok(bincode::serialize(self)?)
+    }
+
+    pub fn deserialize(bytes: &[u8]) -> Result<Despawn, Box<dyn std::error::Error>> {
         Ok(bincode::deserialize(bytes)?)
     }
 }
