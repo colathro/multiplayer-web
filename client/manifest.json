@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Multiplayer Web",
+  "description": "Adds multiplayer to every single website you visit.",
+  "version": "1.0",
+  "action": {
+    "default_popup": "hello.html",
+    "default_icon": "clancy.png"
+  },
+  "permissions": ["activeTab", "scripting"],
+  "content_scripts": [
+    {
+      "js": ["content.js"],
+      "matches": ["https://*/*"]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["/pkg/*"],
+      "matches": ["https://*/*"]
+    }
+  ]
+}

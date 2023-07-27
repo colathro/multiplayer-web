@@ -14,7 +14,7 @@
   </head>
   <body>
     <script type="module">
-      import init, { start_websocket, send_location } from "./pkg/client.js";
+      import init, { start_websocket, send_location } from chrome.runtime.getURL("./pkg/client.js");
       init().then(() => {
         let id_map = {};
 
@@ -37,6 +37,10 @@
           try {
             element.style.top = `0px`;
             element.style.left = `0px`;
+            element.style.position = `fixed`;
+            element.style.background = `red`;
+            element.style.width = `10px`;
+            element.style.height = `10px`;
 
             document.getElementsByTagName("html")[0].append(element);
           } catch (e) {

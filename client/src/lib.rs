@@ -41,9 +41,10 @@ pub unsafe fn start_websocket(
     set_cursor_callback: js_sys::Function,
     spawn_cursor_callback: js_sys::Function,
     despawn_cursor_callback: js_sys::Function,
+    url: js_sys::JsString,
 ) -> Result<WebSocketSend, JsValue> {
     // Connect to an echo server
-    let ws: WebSocket = WebSocket::new("ws://127.0.0.1:8080/ws/")?;
+    let ws: WebSocket = WebSocket::new("wss://multiplayer-web.fly.dev/ws/")?;
     // For small binary messages, like CBOR, Arraybuffer is more efficient than Blob handling
     ws.set_binary_type(web_sys::BinaryType::Arraybuffer);
 
@@ -100,11 +101,14 @@ pub unsafe fn start_websocket(
     let ws_clone = ws.clone();
     let onopen_callback = Closure::<dyn FnMut()>::new(move || {
         console_log!("socket opened");
+
         let mut rng = rand::thread_rng();
+
         let location = Auth {
             id: rng.gen_range(u64::MIN..u64::MAX),
-            url: String::from("http://google.com/"),
+            url: String::from(&url),
         };
+
         let message = Message {
             message_type: MessageType::Auth,
             data: location.serialize().unwrap(),
@@ -121,6 +125,7 @@ pub unsafe fn start_websocket(
     ws.set_onopen(Some(onopen_callback.as_ref().unchecked_ref()));
     onopen_callback.forget();
     let ws_clone = ws.clone();
+
     Ok(WebSocketSend {
         websocket: ws_clone,
     })

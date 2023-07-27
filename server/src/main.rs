@@ -13,6 +13,11 @@ use std::{
     time::Duration,
 };
 
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    return start().await;
+}
+
 /// Define HTTP actor
 struct MyWs {
     user_id: RefCell<Option<u64>>,
@@ -225,7 +230,7 @@ pub async fn start() -> std::io::Result<()> {
             .app_data(data.clone())
             .route("/ws/", web::get().to(index))
     })
-    .bind(("127.0.0.1", 8080))?
+    .bind(("0.0.0.0", 8080))?
     .run()
     .await
 }
